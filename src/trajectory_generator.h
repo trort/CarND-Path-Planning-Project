@@ -32,46 +32,26 @@ public:
     vector<double> ptsx;
     vector<double> ptsy;
 
-    int prev_size = ego.prev_size;
-    double ref_x = ego.car_x;
-    double ref_y = ego.car_y;
-    double ref_yaw = ego.car_yaw;
-    if (prev_size < 2) {
-      double prev_car_x = ego.car_x - cos(ego.car_yaw);
-      double prev_car_y = ego.car_y - sin(ego.car_yaw);
-
-      ptsx.push_back(prev_car_x);
+    /*if (ego.prev_size >= 2) {
       ptsx.push_back(ego.car_x);
-      ptsy.push_back(prev_car_y);
       ptsy.push_back(ego.car_y);
-    }
-    else {
-      ref_x = ego.previous_path_x[prev_size -1];
-      ref_y = ego.previous_path_y[prev_size -1];
-
-      double ref_x_prev = ego.previous_path_x[prev_size - 2];
-      double ref_y_prev = ego.previous_path_y[prev_size - 2];
-      ref_yaw = atan2(ref_y - ref_y_prev, ref_x - ref_x_prev);
-
-      ptsx.push_back(ego.car_x);
-      ptsx.push_back(ref_x_prev);
-      ptsx.push_back(ref_x);
-      ptsy.push_back(ego.car_y);
-      ptsy.push_back(ref_y_prev);
-      ptsy.push_back(ref_y);
-    }
+    }*/
+    ptsx.push_back(ego.end_x_prev);
+    ptsx.push_back(ego.end_x);
+    ptsy.push_back(ego.end_y_prev);
+    ptsy.push_back(ego.end_y);
 
     double car_d = 2 + 4 * target_lane;
-    vector<double> next_wp0 = getXY(ego.car_s + 30, car_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+    vector<double> next_wp0 = getXY(ego.end_s + 30, car_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
     ptsx.push_back(next_wp0[0]); ptsy.push_back(next_wp0[1]);
-    vector<double> next_wp1 = getXY(ego.car_s + 60, car_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+    vector<double> next_wp1 = getXY(ego.end_s + 60, car_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
     ptsx.push_back(next_wp1[0]); ptsy.push_back(next_wp1[1]);
-    vector<double> next_wp2 = getXY(ego.car_s + 90, car_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+    vector<double> next_wp2 = getXY(ego.end_s + 90, car_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
     ptsx.push_back(next_wp2[0]); ptsy.push_back(next_wp2[1]);
 
-    // transform to car coordinates
+    // transform to car coordinates and the end to ensure going forward
     for (int i = 0; i < ptsx.size(); ++i) {
-      vector<double> transformed_xy = map_xy_to_ref(ptsx[i], ptsy[i], ref_x, ref_y, ref_yaw);
+      vector<double> transformed_xy = map_xy_to_ref(ptsx[i], ptsy[i], ego.end_x, ego.end_y, ego.end_yaw);
       ptsx[i] = transformed_xy[0];
       ptsy[i] = transformed_xy[1];
     }
@@ -79,7 +59,7 @@ public:
     tk::spline s;
     s.set_points(ptsx, ptsy);
 
-    for (int i = 0; i < ego.previous_path_x.size(); ++i) {
+    for (int i = 0; i < ego.prev_size; ++i) {
       next_x_vals.push_back(ego.previous_path_x[i]);
       next_y_vals.push_back(ego.previous_path_y[i]);
     }
@@ -90,17 +70,9 @@ public:
     double target_dist = distance(0, 0, target_x, target_y);
     double x_add_on = 0;
 
-    double car_vel;
-    if (prev_size < 2) {
-      car_vel = ego.car_speed / 2.24;
-    }
-    else {
-      double vx = ((double)ego.previous_path_x[prev_size - 1] - (double)ego.previous_path_x[prev_size - 2]) / INTERVAL;
-      double vy = ((double)ego.previous_path_y[prev_size - 1] - (double)ego.previous_path_y[prev_size - 2]) / INTERVAL;
-      car_vel = sqrt(vx * vx + vy * vy);
-    }
+    double car_vel = ego.end_speed;
 
-    for (int i = 0; i < 100 - prev_size; ++i) {
+    for (int i = 0; i < 80 - ego.prev_size; ++i) {
 
       if (car_vel > target_vel) {
         car_vel -= 0.1;
@@ -115,7 +87,7 @@ public:
 
       x_add_on = x_point;
 
-      vector<double> map_xy = car_xy_to_map(x_point, y_point, ref_x, ref_y, ref_yaw);
+      vector<double> map_xy = car_xy_to_map(x_point, y_point, ego.end_x, ego.end_y, ego.end_yaw);
 
       next_x_vals.push_back(map_xy[0]);
       next_y_vals.push_back(map_xy[1]);

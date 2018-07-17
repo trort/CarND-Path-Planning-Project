@@ -19,6 +19,9 @@ using namespace std;
 // for convenience
 using json = nlohmann::json;
 
+// The Car! Using global variable to preserve state across cycles
+Car ego;
+
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
 // else the empty string "" will be returned.
@@ -34,12 +37,9 @@ string hasData(string s) {
   return "";
 }
 
-vector<vector<double>> generate_path(json j, vector<vector<double>> map_waypoints){
+vector<vector<double>> generate_path(json j, TrajectoryGenerator& trajectory_generator){
   // Sensor Fusion Data, a list of all other cars on the same side of the road.
   auto sensor_fusion = j["sensor_fusion"];
-
-  Car ego(j);
-  TrajectoryGenerator trajectory_generator(map_waypoints);
 
   // TODO: define a path made up of (x,y) points that the car will visit sequentially every .02
   // Generate OUTPUT DATA
@@ -76,11 +76,9 @@ vector<vector<double>> generate_path(json j, vector<vector<double>> map_waypoint
     }
   }
   int target_lane = 1;
-  double target_vel;
   for (int check_lane = 0; check_lane < 3; ++ check_lane) {
     if (ref_vel[check_lane] > ref_vel[target_lane] + 1){
       target_lane = check_lane;
-      target_vel = ref_vel[target_lane];
     }
   }
 
@@ -88,8 +86,7 @@ vector<vector<double>> generate_path(json j, vector<vector<double>> map_waypoint
   // starting points as either the current state or the end of previous p
 
   // debug
-  ego.print_car_state();
-  cout << target_lane << " " << target_vel << endl;
+  cout << target_lane << " " << ref_vel[target_lane] << endl;
 
   return trajectory_generator.generate_trajectory(target_lane, ref_vel[target_lane], ego);
 }
@@ -131,7 +128,12 @@ int main() {
   	map_waypoints_dy.push_back(d_y);
   }
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  vector<vector<double>> map_waypoints = {map_waypoints_x, map_waypoints_y, map_waypoints_s,
+        map_waypoints_dx, map_waypoints_dy};
+  TrajectoryGenerator trajectory_generator(map_waypoints);
+
+  // &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy
+  h.onMessage([&trajectory_generator](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -150,18 +152,12 @@ int main() {
         if (event == "telemetry") {
           // j[1] is the data JSON object
           json msgJson;
-          vector<vector<double>> map_waypoints = {map_waypoints_x, map_waypoints_y, map_waypoints_s,
-                                                  map_waypoints_dx, map_waypoints_dy};
+          ego.update(j[1]);
 
-          vector<double> next_x_vals;
-          vector<double> next_y_vals;
+          vector<vector<double>> planed_path = generate_path(j[1], trajectory_generator);
 
-          vector<vector<double>> planed_path = generate_path(j[1], map_waypoints);
-          next_x_vals = planed_path[0];
-          next_y_vals = planed_path[1];
-
-          msgJson["next_x"] = next_x_vals;
-          msgJson["next_y"] = next_y_vals;
+          msgJson["next_x"] = planed_path[0];
+          msgJson["next_y"] = planed_path[1];
 
           auto msg = "42[\"control\","+ msgJson.dump()+"]";
 
