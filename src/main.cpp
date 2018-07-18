@@ -9,9 +9,7 @@
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
-#include "spline.h"
 #include "car.h"
-#include "trajectory_generator.h"
 #include "helper_functions.h"
 
 using namespace std;
@@ -35,60 +33,6 @@ string hasData(string s) {
     return s.substr(b1, b2 - b1 + 2);
   }
   return "";
-}
-
-vector<vector<double>> generate_path(json j, TrajectoryGenerator& trajectory_generator){
-  // Sensor Fusion Data, a list of all other cars on the same side of the road.
-  auto sensor_fusion = j["sensor_fusion"];
-
-  // TODO: define a path made up of (x,y) points that the car will visit sequentially every .02
-  // Generate OUTPUT DATA
-  int ref_lane = 1;
-  vector<double> ref_vel = {MAX_VEL, MAX_VEL, MAX_VEL};
-
-  // sensor fusion part
-  //bool too_close = false;
-  double prev_size = ego.prev_size;
-
-  for (int check_lane = 0; check_lane < 3; ++ check_lane) {
-    for (int i = 0; i < sensor_fusion.size(); ++i) {
-      // unpack sensor fusion data
-      int ss_id = sensor_fusion[i][0];
-      double ss_x = sensor_fusion[i][1];
-      double ss_y = sensor_fusion[i][2];
-      double ss_vx = sensor_fusion[i][3];
-      double ss_vy = sensor_fusion[i][4];
-      double ss_s = sensor_fusion[i][5];
-      double ss_d = sensor_fusion[i][6];
-
-      if (ss_d < (2 + 4 * check_lane + 2) && ss_d > (2 + 4 * check_lane - 2)) {
-        double ss_speed = sqrt(ss_vx * ss_vx + ss_vy * ss_vy);
-        double check_car_s = ss_s + prev_size * INTERVAL * ss_speed;
-
-        if ((check_car_s > ego.car_s) && ((check_car_s - ego.car_s) < 40)) {
-          //ref_vel = ss_speed * 0.9;
-          //too_close = true;
-          if (ref_vel[check_lane] > ss_speed) {
-            ref_vel[check_lane] = ss_speed;
-          }
-        }
-      }
-    }
-  }
-  int target_lane = 1;
-  for (int check_lane = 0; check_lane < 3; ++ check_lane) {
-    if (ref_vel[check_lane] > ref_vel[target_lane] + 1){
-      target_lane = check_lane;
-    }
-  }
-
-
-  // starting points as either the current state or the end of previous p
-
-  // debug
-  cout << target_lane << " " << ref_vel[target_lane] << endl;
-
-  return trajectory_generator.generate_trajectory(target_lane, ref_vel[target_lane], ego);
 }
 
 int main() {
@@ -127,13 +71,11 @@ int main() {
   	map_waypoints_dx.push_back(d_x);
   	map_waypoints_dy.push_back(d_y);
   }
-
   vector<vector<double>> map_waypoints = {map_waypoints_x, map_waypoints_y, map_waypoints_s,
         map_waypoints_dx, map_waypoints_dy};
-  TrajectoryGenerator trajectory_generator(map_waypoints);
+  ego.update_map(map_waypoints);
 
-  // &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy
-  h.onMessage([&trajectory_generator](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  h.onMessage([](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -152,9 +94,8 @@ int main() {
         if (event == "telemetry") {
           // j[1] is the data JSON object
           json msgJson;
-          ego.update(j[1]);
 
-          vector<vector<double>> planed_path = generate_path(j[1], trajectory_generator);
+          vector<vector<double>> planed_path = ego.generate_path(j[1]);
 
           msgJson["next_x"] = planed_path[0];
           msgJson["next_y"] = planed_path[1];

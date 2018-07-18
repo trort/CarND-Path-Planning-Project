@@ -9,8 +9,6 @@ using namespace std;
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
 double rad2deg(double x) { return x * 180 / pi(); }
-const double INTERVAL = 0.02;
-const double MAX_VEL = 49.5 / 2.24; // convert mph to m/s
 
 double distance(double x1, double y1, double x2, double y2)
 {
@@ -158,6 +156,13 @@ vector<double> car_xy_to_map(double x, double y, double ref_x, double ref_y, dou
   return {x_point, y_point};
 }
 
+int d2lane(double d){
+  if (d < 0) return -1;
+  else if (d < 4) return 0;
+  else if (d < 8) return 1;
+  else if (d < 12) return 2;
+  else return 3;
+}
 
 #endif
 
