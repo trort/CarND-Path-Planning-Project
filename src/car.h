@@ -74,7 +74,7 @@ public:
     lane = d2lane(car_d);
     if (target_lane == -1) target_lane = lane;
 
-    prev_size = min(int(j["previous_path_x"].size()), 10);    // load no more than 40 points (0.8s) to allow path innovation
+    prev_size = min(int(j["previous_path_x"].size()), 10);    // load no more than 10 points (0.2s) to allow path innovation
     previous_path_x.clear(); previous_path_y.clear();
     for (int i = 0; i < prev_size; ++i) {
       previous_path_x.push_back(j["previous_path_x"][i]);
